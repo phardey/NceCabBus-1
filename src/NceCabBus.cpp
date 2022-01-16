@@ -284,7 +284,7 @@ void NceCabBus::processUSBByte(uint8_t inByte)
 
 		case 0xA2: // Locomotive Control Command 0xA2 <addr_h> <addr_l> <op_1> <data_1>
 		{
-			uint16_t address = 0x0FFF & ((USBCommandBuffer.data[1] << 8) + USBCommandBuffer.data[2]);
+			uint16_t address = 0x3FFF & ((USBCommandBuffer.data[1] << 8) + USBCommandBuffer.data[2]);
 			if ((address < 3) || (address > 9999))
 			{
 				sendUSBResponse(USB_ADDRESS_OUT_OF_RANGE);
@@ -377,7 +377,7 @@ void NceCabBus::processUSBByte(uint8_t inByte)
 
 		case 0xAD: // Accy/Signal and macro commands  0xAD <addr_h> <addr_l> <op_1> <data_1>
 		{
-			uint16_t address = 0x0FFF & ((USBCommandBuffer.data[1] << 8) + USBCommandBuffer.data[2]);
+			uint16_t address = 0x07FF & ((USBCommandBuffer.data[1] << 8) + USBCommandBuffer.data[2]);
 			if (address > 2044)
 			{
 				sendUSBResponse(USB_ADDRESS_OUT_OF_RANGE);
@@ -395,7 +395,7 @@ void NceCabBus::processUSBByte(uint8_t inByte)
 
 		case 0xAE: // OP's Program loco CV 0xAE <addr_h> <addr_l> <cv_h> <cv_l> <data_1> 
 		{
-			uint16_t address = 0x0FFF & ((USBCommandBuffer.data[1] << 8) + USBCommandBuffer.data[2]);
+			uint16_t address = 0x3FFF & ((USBCommandBuffer.data[1] << 8) + USBCommandBuffer.data[2]);
 			uint16_t CVaddress = 0x0FFF & ((USBCommandBuffer.data[3] << 8) + USBCommandBuffer.data[4]);
 			uint16_t datavalue = USBCommandBuffer.data[5];
 
@@ -425,7 +425,7 @@ void NceCabBus::processUSBByte(uint8_t inByte)
 
 		case 0xAF: // OP's Program accessory/signal 0xAF <addr_h> <addr_l> <cv_h> <cv_l> <data_1> 
 		{
-			uint16_t address = 0x0FFF & ((USBCommandBuffer.data[1] << 8) + USBCommandBuffer.data[2]);
+			uint16_t address = 0x07FF & ((USBCommandBuffer.data[1] << 8) + USBCommandBuffer.data[2]);
 			uint16_t CVaddress = 0x0FFF & ((USBCommandBuffer.data[3] << 8) + USBCommandBuffer.data[4]);
 			uint16_t datavalue = USBCommandBuffer.data[5];
 			
@@ -1031,7 +1031,7 @@ void NceCabBus::processResponseByte(uint8_t inByte)
 					}
 
 				}
-				if (USBCommandBuffer.data[0] == 0xB5)
+				if (USBCommandBuffer.data[0] == 0xB5) // This function has no status reply
 				USBResponseBuffer.count = 1;
 				else
 				USBResponseBuffer.count = 2;
@@ -1071,7 +1071,7 @@ void NceCabBus::processResponseByte(uint8_t inByte)
 					}
 
 				}
-				if ((USBCommandBuffer.data[0] == 0xB5) || (USBCommandBuffer.data[0] == 0x9B))
+				if ((USBCommandBuffer.data[0] == 0xB5) || (USBCommandBuffer.data[0] == 0x9B)) // This function has no status reply
 					USBResponseBuffer.count = 2;
 				else
 					USBResponseBuffer.count = 3;
