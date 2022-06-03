@@ -285,7 +285,7 @@ void NceCabBus::processUSBByte(uint8_t inByte)
 		case 0xA2: // Locomotive Control Command 0xA2 <addr_h> <addr_l> <op_1> <data_1>
 		{
 			uint16_t address = 0x3FFF & ((USBCommandBuffer.data[1] << 8) + USBCommandBuffer.data[2]);
-			if ((address < 3) || (address > 9999))
+			if ((address < 0) || (address > 9999))
 			{
 				sendUSBResponse(USB_ADDRESS_OUT_OF_RANGE);
 				return;
@@ -494,6 +494,11 @@ void NceCabBus::processUSBByte(uint8_t inByte)
 
 		case 0xB5: // 0xB5 xx return 1,2,4  bytes (indicated by xx = 1,2, or 4) from cab memory at memory pointer location the pointer will increment after the read
 
+			if (pLogger)
+			{
+				pLogger->print("\nGet Data B5: ");
+				pLogger->println();
+			}
 		{
 
 			CabBusCommandBuffer.data[0] = 0x4E;
@@ -515,6 +520,7 @@ void NceCabBus::processUSBByte(uint8_t inByte)
 
 		USBCommandBuffer.expectedLength = 0;
 		USBCommandBuffer.count = 0;
+
 	}
 }
 
