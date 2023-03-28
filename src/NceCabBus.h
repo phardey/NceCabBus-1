@@ -51,6 +51,7 @@ typedef enum
 {
   CAB_STATE_UNKNOWN = 0,
   CAB_STATE_PING_OTHER,			// Pinging other nodes
+  CAB_STATE_REPLY_MY_CMD,       // Replying added this state to try and get show cabs function more reliable
   CAB_STATE_EXEC_MY_CMD,		// Handle Node Commands 
   CAB_STATE_EXEC_BROADCAST_CMD, // Ping Broadcast
 } CAB_STATE;
