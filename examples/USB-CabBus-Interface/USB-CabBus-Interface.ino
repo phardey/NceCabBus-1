@@ -8,7 +8,7 @@
 // that is available at the world-wide-web at: http://www.gnu.org/licenses/gpl.txt
 //-------------------------------------------------------------------------------------------------------
 // file:      USBInterface.ino
-// author:    Paul Hardey   
+// author:    Alex Shepherd & Paul Hardey
 // history:   2021-06-04 Initial Version
 //-------------------------------------------------------------------------------------------------------
 // purpose:   Demonstrate how to use the NceCabBus library to build a USB Interface device to JMRI
@@ -36,7 +36,7 @@
 #define RS485_TX_ENABLE_PIN 4
 
 // Change the line below to match the RS485 Chip TX Enable pin for Serial Debug 
-#define DEBUG_RS485_TX_ENABLE_PIN 3
+//#define DEBUG_RS485_TX_ENABLE_PIN 3
 
 // Change the line below to match the Serial port you're using for JMRI 
 #define JMRISerial Serial
@@ -54,13 +54,16 @@
 // Uncomment the #define below to enable printing of RS485 Bytes Debug output to the DebugMonSerial device
 //#define DEBUG_RS485_BYTES
 
-// Uncomment the line below to enable Debug output of the JMRI commands Changes
+// Uncomment the line below to enable Debug input of the JMRI commands Changes from JMRI
 //#define DEBUG_JMRI_INPUT
+
+// Uncomment the line below to enable Debug output of the JMRI commands Changes to JMRI
+//#define DEBUG_JMRI_OUTPUT
 
 // Uncomment the #define below to enable printing of NceCabBus Library Debug output to the DebugMonSerial device
 //#define DEBUG_LIBRARY
 
-#if defined(DEBUG_RS485_BYTES) || defined(DEBUG_JMRI_INPUT) || defined(DEBUG_LIBRARY) || defined(DebugMonSerial)
+#if defined(DEBUG_RS485_BYTES) || defined(DEBUG_JMRI_INPUT) || defined(DEBUG_JMRI_OUTPUT) || defined(DEBUG_LIBRARY) || defined(DebugMonSerial)
 #define ENABLE_DEBUG_SERIAL
 #endif
 #endif
@@ -76,7 +79,7 @@ void sendUSBBytes(uint8_t *values, uint8_t length)
     JMRISerial.write(values,length);
     JMRISerial.flush();
 
-#ifdef DEBUG_JMRI_INPUT
+#ifdef DEBUG_JMRI_OUTPUT
     DebugMonSerial.print("\nsendUSBBytes: " );
     for( uint8_t i = 0; i < length; i++)
     {
@@ -94,7 +97,7 @@ void sendUSBBytes(uint8_t *values, uint8_t length)
 void sendRS485Bytes(uint8_t *values, uint8_t length)
 {
   // Seem to need a short delay to make sure the RS485 Master has disable Tx and is ready for our response
-  delayMicroseconds(200);
+  delayMicroseconds(150);
   
   digitalWrite(RS485_TX_ENABLE_PIN, HIGH);
   RS485Serial.write(values, length);
@@ -155,8 +158,19 @@ void loop() {
  // Read the incoming bytes on the RS485 cabbus network and processByte
  if(RS485Serial.available())
   {
+    String cabbusstate;
+    cabbusstate = cabBus.getCabState();
+    #ifdef DEBUG_JMRI_OUTPUT
+
+          DebugMonSerial.print("cabbus state ");
+          DebugMonSerial.println(cabbusstate);
+     #endif
+      
     uint8_t rxByte = RS485Serial.read();
     cabBus.processByte(rxByte);
+    
+    if(cabBus.getCabState() != CAB_STATE_REPLY_MY_CMD)
+    return;
     cabBus.processResponseByte(rxByte); 
    
 

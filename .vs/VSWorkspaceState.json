@@ -5,6 +5,6 @@
     "\\examples\\USB-CabBus-Interface",
     "\\src"
   ],
-  "SelectedNode": "\\examples\\USB-CabBus-Interface\\USB-CabBus-Interface.ino",
+  "SelectedNode": "\\src\\NceCabBus.cpp",
   "PreviewInSolutionExplorer": false
 }

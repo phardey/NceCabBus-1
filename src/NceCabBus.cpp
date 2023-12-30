@@ -689,354 +689,362 @@ CAB_STATE NceCabBus::getCabState()
 
 void NceCabBus::processByte(uint8_t inByte)
 {
-	if ((inByte & CMD_TYPE_MASK) == CMD_TYPE_POLL)
+	if (cabState != CAB_STATE_REPLY_MY_CMD)
 	{
-		uint8_t polledAddress = inByte & CMD_ASCII_MASK;
-
-		cmdBufferIndex = 0;
-
-		if (polledAddress == 0)
-			cabState = CAB_STATE_EXEC_BROADCAST_CMD;
-
-		else if (polledAddress != cabAddress)
-			cabState = CAB_STATE_PING_OTHER;
-
-		else
+		if ((inByte & CMD_TYPE_MASK) == CMD_TYPE_POLL)
 		{
-			cabState = CAB_STATE_EXEC_MY_CMD;	// Listen for a Command
+			uint8_t polledAddress = inByte & CMD_ASCII_MASK;
 
-			switch (cabType)
+			cmdBufferIndex = 0;
+
+			if (polledAddress == 0)
+				cabState = CAB_STATE_EXEC_BROADCAST_CMD;
+
+			else if (polledAddress != cabAddress)
+				cabState = CAB_STATE_PING_OTHER;
+
+			else
 			{
-			case CAB_TYPE_LCD:
-				send2BytesResponse(keyCode, speedKnob);
-				keyCode = BTN_NO_KEY_DN;
-				break;
-			case CAB_TYPE_NO_LCD:
-				send2BytesResponse(keyCode, speedKnob);
-				keyCode = BTN_NO_KEY_DN;
-				break;
-			case CAB_TYPE_SMART:
+				cabState = CAB_STATE_EXEC_MY_CMD;	// Listen for a Command
 
-				if (CabBusCommandBuffer.count)
+				switch (cabType)
 				{
-					if (func_RS485SendBytes)
-						func_RS485SendBytes(CabBusCommandBuffer.data, CabBusCommandBuffer.count);
+				case CAB_TYPE_LCD:
+					send2BytesResponse(keyCode, speedKnob);
+					keyCode = BTN_NO_KEY_DN;
+					break;
+				case CAB_TYPE_NO_LCD:
+					send2BytesResponse(keyCode, speedKnob);
+					keyCode = BTN_NO_KEY_DN;
+					break;
+				case CAB_TYPE_SMART:
 
-					if (pLogger)
+					if (CabBusCommandBuffer.count)
 					{
-						pLogger->print("\nSend RS485: ");
-						for (uint8_t i = 0; i < CabBusCommandBuffer.count; i++)
+						if (func_RS485SendBytes)
+							func_RS485SendBytes(CabBusCommandBuffer.data, CabBusCommandBuffer.count);
+
+						if (pLogger)
 						{
-							if (CabBusCommandBuffer.data[i] < 16)
-								pLogger->print('0');
-							pLogger->print(CabBusCommandBuffer.data[i], HEX);
-							pLogger->print(' ');
+							pLogger->print("\nSend RS485: ");
+							for (uint8_t i = 0; i < CabBusCommandBuffer.count; i++)
+							{
+								if (CabBusCommandBuffer.data[i] < 16)
+									pLogger->print('0');
+								pLogger->print(CabBusCommandBuffer.data[i], HEX);
+								pLogger->print(' ');
+							}
+							pLogger->println();
 						}
-						pLogger->println();
+
+						CabBusCommandBuffer.count = 0;
+						if (CabBusCommandBuffer1.count == 0)
+							// if not a read function send the reply here or not a two pass function prog on main or Accy
+
+							if ((USBCommandBuffer.data[0] == 0x96) || (USBCommandBuffer.data[0] == 0x9E) ||
+								(USBCommandBuffer.data[0] == 0x9F) || (USBCommandBuffer.data[0] == 0xA0) ||
+								(USBCommandBuffer.data[0] == 0xA2) || (USBCommandBuffer.data[0] == 0xA6) ||
+								(USBCommandBuffer.data[0] == 0xA8) || (USBCommandBuffer.data[0] == 0xAD) ||
+								(USBCommandBuffer.data[0] == 0xAE) || (USBCommandBuffer.data[0] == 0xAF) ||
+								(USBCommandBuffer.data[0] == 0xB3) || (USBCommandBuffer.data[0] == 0xB4) ||
+								(USBCommandBuffer.data[0] == 0x9C))
+
+							{
+								sendUSBResponse(USB_COMMAND_COMPLETED_SUCCESSFULLY);
+							}
+							else if
+
+								((USBCommandBuffer.data[0] == 0xA1) || (USBCommandBuffer.data[0] == 0xA7) ||
+								(USBCommandBuffer.data[0] == 0xA9) || (USBCommandBuffer.data[0] == 0xB5))
+
+								cabState = CAB_STATE_REPLY_MY_CMD;
+						break;
 					}
 
-					CabBusCommandBuffer.count = 0;
-					if (CabBusCommandBuffer1.count == 0)
-					// if not a read function send the reply here or not a two pass function prog on main or Accy
-					
-					if ((USBCommandBuffer.data[0] == 0x96) || (USBCommandBuffer.data[0] == 0x9E) ||
-						(USBCommandBuffer.data[0] == 0x9F) || (USBCommandBuffer.data[0] == 0xA0) ||
-						(USBCommandBuffer.data[0] == 0xA2) || (USBCommandBuffer.data[0] == 0xA6) ||
-						(USBCommandBuffer.data[0] == 0xA8) || (USBCommandBuffer.data[0] == 0xAd) ||
-						(USBCommandBuffer.data[0] == 0xAE) || (USBCommandBuffer.data[0] == 0xAF) ||
-						(USBCommandBuffer.data[0] == 0xB3) || (USBCommandBuffer.data[0] == 0xB4))
-
+					if (CabBusCommandBuffer1.count)
 					{
-						sendUSBResponse(USB_COMMAND_COMPLETED_SUCCESSFULLY);
+						if (func_RS485SendBytes)
+							func_RS485SendBytes(CabBusCommandBuffer1.data, CabBusCommandBuffer1.count);
+
+						if (pLogger)
+						{
+							pLogger->print("\nSend RS485: ");
+							for (uint8_t i = 0; i < CabBusCommandBuffer1.count; i++)
+							{
+								if (CabBusCommandBuffer1.data[i] < 16)
+									pLogger->print('0');
+								pLogger->print(CabBusCommandBuffer1.data[i], HEX);
+								pLogger->print(' ');
+							}
+							pLogger->println();
+						}
+
+						CabBusCommandBuffer1.count = 0;
+
+						// Send the Acknowledge here if its a two pass function prog on main or Accy
+
+						if ((USBCommandBuffer.data[0] == 0x96) || (USBCommandBuffer.data[0] == 0x9E) ||
+							(USBCommandBuffer.data[0] == 0x9F) || (USBCommandBuffer.data[0] == 0xA0) ||
+							(USBCommandBuffer.data[0] == 0xA2) || (USBCommandBuffer.data[0] == 0xA6) ||
+							(USBCommandBuffer.data[0] == 0xA8) || (USBCommandBuffer.data[0] == 0xAd) ||
+							(USBCommandBuffer.data[0] == 0xAE) || (USBCommandBuffer.data[0] == 0xAF) ||
+							(USBCommandBuffer.data[0] == 0xB3) || (USBCommandBuffer.data[0] == 0xB4) ||
+							(USBCommandBuffer.data[0] == 0x9C))
+
+						{
+							sendUSBResponse(USB_COMMAND_COMPLETED_SUCCESSFULLY);
+						}
+						break;
 					}
+
+
+
+
+				case CAB_TYPE_AIU:
+					send2BytesResponse(aiuState & 0x7F, (aiuState >> 7) & 0x7F);
+					break;
+
+				case CAB_TYPE_UNKNOWN:
+				case CAB_TYPE_RESERVED:
+				case CAB_TYPE_XBUS_BRIDGE:
+				case CAB_TYPE_LOCONET_BRIDGE:
+				default:
 					break;
 				}
-				
-				if (CabBusCommandBuffer1.count)
-				{
-					if (func_RS485SendBytes)
-						func_RS485SendBytes(CabBusCommandBuffer1.data, CabBusCommandBuffer1.count);
-
-					if (pLogger)
-					{
-						pLogger->print("\nSend RS485: ");
-						for (uint8_t i = 0; i < CabBusCommandBuffer1.count; i++)
-						{
-							if (CabBusCommandBuffer1.data[i] < 16)
-								pLogger->print('0');
-							pLogger->print(CabBusCommandBuffer1.data[i], HEX);
-							pLogger->print(' ');
-						}
-						pLogger->println();
-					}
-
-					CabBusCommandBuffer1.count = 0;
-
-					// Send the Acknowledge here if its a two pass function prog on main or Accy
-
-					if ((USBCommandBuffer.data[0] == 0x96) || (USBCommandBuffer.data[0] == 0x9E) ||
-						(USBCommandBuffer.data[0] == 0x9F) || (USBCommandBuffer.data[0] == 0xA0) ||
-						(USBCommandBuffer.data[0] == 0xA2) || (USBCommandBuffer.data[0] == 0xA6) ||
-						(USBCommandBuffer.data[0] == 0xA8) || (USBCommandBuffer.data[0] == 0xAd) ||
-						(USBCommandBuffer.data[0] == 0xAE) || (USBCommandBuffer.data[0] == 0xAF) ||
-						(USBCommandBuffer.data[0] == 0xB3) || (USBCommandBuffer.data[0] == 0xB4))
-
-					{
-						sendUSBResponse(USB_COMMAND_COMPLETED_SUCCESSFULLY);
-					}
-					break;
-				}
-				
-				
-
-
-			case CAB_TYPE_AIU:
-				send2BytesResponse(aiuState & 0x7F, (aiuState >> 7) & 0x7F);
-				break;
-
-			case CAB_TYPE_UNKNOWN:
-			case CAB_TYPE_RESERVED:
-			case CAB_TYPE_XBUS_BRIDGE:
-			case CAB_TYPE_LOCONET_BRIDGE:
-			default:
-				break;
 			}
 		}
-	}
 
-	else if (cabState >= CAB_STATE_EXEC_MY_CMD)
-	{
-		if (cmdBufferIndex == 0)
-			cmdBufferExpectedLength = getCmdDataLen(inByte, cabState == CAB_STATE_EXEC_BROADCAST_CMD);
-
-		if (cmdBufferIndex && (cmdBufferExpectedLength > 2))
-			cmdBuffer[cmdBufferIndex++] = adjustCabBusASCII(inByte);
-		else
-			cmdBuffer[cmdBufferIndex++] = inByte;
-
-		if (cmdBufferIndex == cmdBufferExpectedLength)
+		else if (cabState >= CAB_STATE_EXEC_MY_CMD)
 		{
-			if (pLogger)
+			if (cmdBufferIndex == 0)
+				cmdBufferExpectedLength = getCmdDataLen(inByte, cabState == CAB_STATE_EXEC_BROADCAST_CMD);
+
+			if (cmdBufferIndex && (cmdBufferExpectedLength > 2))
+				cmdBuffer[cmdBufferIndex++] = adjustCabBusASCII(inByte);
+			else
+				cmdBuffer[cmdBufferIndex++] = inByte;
+
+			if (cmdBufferIndex == cmdBufferExpectedLength)
 			{
-				pLogger->print("\nCmd: ");
-				for (uint8_t i = 0; i < cmdBufferExpectedLength; i++)
+				if (pLogger)
 				{
-					if (cmdBuffer[i] < 16)
-						pLogger->print('0');
-					pLogger->print(cmdBuffer[i], HEX);
-					pLogger->print('-');
-					char asciiValue = (char)(cmdBuffer[i] & CMD_ASCII_MASK);
-					pLogger->print(asciiValue);
-					pLogger->print(' ');
-				}
-			}
-
-			uint8_t Command = cmdBuffer[0];
-
-			if (cabState == CAB_STATE_EXEC_MY_CMD)
-			{
-				switch (Command)
-				{
-				case CMD_CAB_TYPE:
-					send1ByteResponse(cabType);
-					break;
-
-
-				case FAST_CLOCK_RATE_BCAST:	// Broadcast Fast Clock Rate
-					if (FastClockRate != cmdBuffer[1])
+					pLogger->print("\nCmd: ");
+					for (uint8_t i = 0; i < cmdBufferExpectedLength; i++)
 					{
-						FastClockRate = cmdBuffer[1];
+						if (cmdBuffer[i] < 16)
+							pLogger->print('0');
+						pLogger->print(cmdBuffer[i], HEX);
+						pLogger->print('-');
+						char asciiValue = (char)(cmdBuffer[i] & CMD_ASCII_MASK);
+						pLogger->print(asciiValue);
+						pLogger->print(' ');
+					}
+				}
+
+				uint8_t Command = cmdBuffer[0];
+
+				if (cabState == CAB_STATE_EXEC_MY_CMD)
+				{
+					switch (Command)
+					{
+					case CMD_CAB_TYPE:
+						send1ByteResponse(cabType);
+						break;
+
+
+					case FAST_CLOCK_RATE_BCAST:	// Broadcast Fast Clock Rate
+						if (FastClockRate != cmdBuffer[1])
+						{
+							FastClockRate = cmdBuffer[1];
+							if (func_FastClockHandler && (FastClockMode > FAST_CLOCK_NOT_SET) && (FastClockRate > 0))
+								func_FastClockHandler(FastClockHours, FastClockMinutes, FastClockRate, FastClockMode);
+						}
+						break;
+
+						// 				case CMD_PR_1ST_RIGHT:  // Actually the same value as FAST_CLOCK_BCAST
+					case FAST_CLOCK_BCAST:	// Broadcast Fast Clock Time
+						FastClockHours = ((cmdBuffer[2] - '0') * 10) + (cmdBuffer[3] - '0');
+						FastClockMinutes = ((cmdBuffer[5] - '0') * 10) + (cmdBuffer[6] - '0');
+						if (cmdBuffer[7] == 'A')
+							FastClockMode = FAST_CLOCK_AM;
+						else if (cmdBuffer[7] == 'P')
+							FastClockMode = FAST_CLOCK_PM;
+						else
+							FastClockMode = FAST_CLOCK_24;
+
 						if (func_FastClockHandler && (FastClockMode > FAST_CLOCK_NOT_SET) && (FastClockRate > 0))
 							func_FastClockHandler(FastClockHours, FastClockMinutes, FastClockRate, FastClockMode);
+
+						// Let code fall-through to next case statements to continue
+
+					case CMD_PR_1ST_LEFT:
+					case CMD_PR_2ND_LEFT:
+					case CMD_PR_2ND_RIGHT:
+					case CMD_PR_3RD_LEFT:
+					case CMD_PR_3RD_RIGHT:
+					case CMD_PR_4TH_LEFT:
+					case CMD_PR_4TH_RIGHT:
+						if (func_LCDUpdateHandler)
+						{
+							uint8_t Row = (Command & 0x03) >> 1;
+							uint8_t Col = (Command & 0x01) * 8;
+
+							func_LCDUpdateHandler(Col, Row, (char*)cmdBuffer + 1, 8);
+						}
+						break;
+
+					case CMD_MOVE_CURSOR:
+						if (func_LCDMoveCursorHandler)
+						{
+							if ((cmdBuffer[1] >= 0x80) && (cmdBuffer[1] <= 0x8F))
+								func_LCDMoveCursorHandler(cmdBuffer[1] - 0x80, 0);
+
+							else if ((cmdBuffer[1] >= 0xC0) && (cmdBuffer[1] <= 0xCF))
+								func_LCDMoveCursorHandler(cmdBuffer[1] - 0xC0, 1);
+						}
+						break;
+
+					case CMD_PR_TTY:
+					case CMD_PR_TTY_NEXT:
+						if (func_LCDPrintCharHandler)
+							func_LCDPrintCharHandler((char)(cmdBuffer[1] & CMD_ASCII_MASK), Command == CMD_PR_TTY_NEXT);
+						break;
+
+					case CMD_HOME:
+						if (func_LCDCursorModeHandler)
+							func_LCDCursorModeHandler(CURSOR_HOME);
+
+					case CMD_CLEAR_HOME:
+						if (func_LCDCursorModeHandler)
+							func_LCDCursorModeHandler(CURSOR_CLEAR_HOME);
+
+					case CMD_CURSOR_OFF:
+						if (func_LCDCursorModeHandler)
+							func_LCDCursorModeHandler(CURSOR_OFF);
+
+					case CMD_CURSOR_ON:
+						if (func_LCDCursorModeHandler)
+							func_LCDCursorModeHandler(CURSOR_ON);
+
+					case CMD_DISP_RIGHT:
+						if (func_LCDCursorModeHandler)
+							func_LCDCursorModeHandler(DISPLAY_SHIFT_RIGHT);
+
 					}
-					break;
-
-// 				case CMD_PR_1ST_RIGHT:  // Actually the same value as FAST_CLOCK_BCAST
-				case FAST_CLOCK_BCAST:	// Broadcast Fast Clock Time
-					FastClockHours = ((cmdBuffer[2] - '0') * 10) + (cmdBuffer[3] - '0');
-					FastClockMinutes = ((cmdBuffer[5] - '0') * 10) + (cmdBuffer[6] - '0');
-					if (cmdBuffer[7] == 'A')
-						FastClockMode = FAST_CLOCK_AM;
-					else if (cmdBuffer[7] == 'P')
-						FastClockMode = FAST_CLOCK_PM;
-					else
-						FastClockMode = FAST_CLOCK_24;
-
- 					if (func_FastClockHandler && (FastClockMode > FAST_CLOCK_NOT_SET) && (FastClockRate > 0))
-						func_FastClockHandler(FastClockHours, FastClockMinutes, FastClockRate, FastClockMode);
-
-					// Let code fall-through to next case statements to continue
-					
-				case CMD_PR_1ST_LEFT:
-				case CMD_PR_2ND_LEFT:
-				case CMD_PR_2ND_RIGHT:
-				case CMD_PR_3RD_LEFT:
-				case CMD_PR_3RD_RIGHT:
-				case CMD_PR_4TH_LEFT:
-				case CMD_PR_4TH_RIGHT:
-					if (func_LCDUpdateHandler)
-					{
-						uint8_t Row = (Command & 0x03) >> 1;
-						uint8_t Col = (Command & 0x01) * 8;
-
-						func_LCDUpdateHandler(Col, Row, (char*)cmdBuffer + 1, 8);
-					}
-					break;
-
-				case CMD_MOVE_CURSOR:
-					if (func_LCDMoveCursorHandler)
-					{
-						if ((cmdBuffer[1] >= 0x80) && (cmdBuffer[1] <= 0x8F))
-							func_LCDMoveCursorHandler(cmdBuffer[1] - 0x80, 0);
-
-						else if ((cmdBuffer[1] >= 0xC0) && (cmdBuffer[1] <= 0xCF))
-							func_LCDMoveCursorHandler(cmdBuffer[1] - 0xC0, 1);
-					}
-					break;
-
-				case CMD_PR_TTY:
-				case CMD_PR_TTY_NEXT:
-					if (func_LCDPrintCharHandler)
-						func_LCDPrintCharHandler((char)(cmdBuffer[1] & CMD_ASCII_MASK), Command == CMD_PR_TTY_NEXT);
-					break;
-
-				case CMD_HOME:
-					if (func_LCDCursorModeHandler)
-						func_LCDCursorModeHandler(CURSOR_HOME);
-
-				case CMD_CLEAR_HOME:
-					if (func_LCDCursorModeHandler)
-						func_LCDCursorModeHandler(CURSOR_CLEAR_HOME);
-
-				case CMD_CURSOR_OFF:
-					if (func_LCDCursorModeHandler)
-						func_LCDCursorModeHandler(CURSOR_OFF);
-
-				case CMD_CURSOR_ON:
-					if (func_LCDCursorModeHandler)
-						func_LCDCursorModeHandler(CURSOR_ON);
-
-				case CMD_DISP_RIGHT:
-					if (func_LCDCursorModeHandler)
-						func_LCDCursorModeHandler(DISPLAY_SHIFT_RIGHT);
-
 				}
-			}
 
-			else if (cabState == CAB_STATE_EXEC_BROADCAST_CMD)
-			{
-				switch (Command)
+				else if (cabState == CAB_STATE_EXEC_BROADCAST_CMD)
 				{
-				case FAST_CLOCK_BCAST:	// Broadcast Fast Clock Time
-					FastClockHours = ((cmdBuffer[2] - '0') * 10) + (cmdBuffer[3] - '0');
-					FastClockMinutes = ((cmdBuffer[5] - '0') * 10) + (cmdBuffer[6] - '0');
-					if (cmdBuffer[7] == 'A')
-						FastClockMode = FAST_CLOCK_AM;
-					else if (cmdBuffer[7] == 'P')
-						FastClockMode = FAST_CLOCK_PM;
-					else
-						FastClockMode = FAST_CLOCK_24;
-
-					if (func_FastClockHandler && (FastClockMode > FAST_CLOCK_NOT_SET) && (FastClockRate > 0))
-						func_FastClockHandler(FastClockHours, FastClockMinutes, FastClockRate, FastClockMode);
-
-					if (cabType == CAB_TYPE_LCD && func_LCDUpdateHandler)
+					switch (Command)
 					{
-						uint8_t yPos = (Command & 0x03) >> 1;
-						uint8_t xPos = (Command & 0x01) * 8;
+					case FAST_CLOCK_BCAST:	// Broadcast Fast Clock Time
+						FastClockHours = ((cmdBuffer[2] - '0') * 10) + (cmdBuffer[3] - '0');
+						FastClockMinutes = ((cmdBuffer[5] - '0') * 10) + (cmdBuffer[6] - '0');
+						if (cmdBuffer[7] == 'A')
+							FastClockMode = FAST_CLOCK_AM;
+						else if (cmdBuffer[7] == 'P')
+							FastClockMode = FAST_CLOCK_PM;
+						else
+							FastClockMode = FAST_CLOCK_24;
 
-						func_LCDUpdateHandler(xPos, yPos, (char*)cmdBuffer + 1, 8);
-					}
-					break;
-
-				case FAST_CLOCK_RATE_BCAST:	// Broadcast Fast Clock Rate
-					if (FastClockRate != cmdBuffer[1])
-					{
-						FastClockRate = cmdBuffer[1];
 						if (func_FastClockHandler && (FastClockMode > FAST_CLOCK_NOT_SET) && (FastClockRate > 0))
 							func_FastClockHandler(FastClockHours, FastClockMinutes, FastClockRate, FastClockMode);
+
+						if (cabType == CAB_TYPE_LCD && func_LCDUpdateHandler)
+						{
+							uint8_t yPos = (Command & 0x03) >> 1;
+							uint8_t xPos = (Command & 0x01) * 8;
+
+							func_LCDUpdateHandler(xPos, yPos, (char*)cmdBuffer + 1, 8);
+						}
+						break;
+
+					case FAST_CLOCK_RATE_BCAST:	// Broadcast Fast Clock Rate
+						if (FastClockRate != cmdBuffer[1])
+						{
+							FastClockRate = cmdBuffer[1];
+							if (func_FastClockHandler && (FastClockMode > FAST_CLOCK_NOT_SET) && (FastClockRate > 0))
+								func_FastClockHandler(FastClockHours, FastClockMinutes, FastClockRate, FastClockMode);
+						}
+						break;
 					}
-					break;
 				}
+				cmdBufferIndex = 0;
 			}
-			cmdBufferIndex = 0;
 		}
 	}
 }
 
 void NceCabBus::processResponseByte(uint8_t inByte)
 {
-	if ((inByte == 0xD8) || (inByte == 0xD9) || (inByte == 0xDA))
+	if (cabState == CAB_STATE_REPLY_MY_CMD)
 	{
-		CabBusReplyBuffer.count = 0;
-		CabBusReplyBuffer.Receive_Reply = true;
-		CabBusReplyBuffer.ReplySize;
-
-		switch (inByte)
+		if (pLogger)
 		{
+			pLogger->print("Testing Recieve Byte was  ");
+			pLogger->print(inByte, HEX);
+			pLogger->println();
+			pLogger->print("Cab State ");
+			pLogger->println(cabState);
+		}
+
+		if (((inByte == 0xD8) || (inByte == 0xD9) || (inByte == 0xDA)) && (CabBusReplyBuffer.Receive_Reply == false))
+		{
+
+			CabBusReplyBuffer.ReplySize;
+
+			switch (inByte)
+			{
 			case 0xD8:
 			{
 				CabBusReplyBuffer.ReplySize = 3;
-			break;
+				CabBusReplyBuffer.count = 0;
+				CabBusReplyBuffer.Receive_Reply = true;
+				break;
 			}
 			case 0xD9:
 			{
 				CabBusReplyBuffer.ReplySize = 4;
-			break;
+				CabBusReplyBuffer.count = 0;
+				CabBusReplyBuffer.Receive_Reply = true;
+				break;
 			}
 			case 0xDA:
 			{
 				CabBusReplyBuffer.ReplySize = 7;
-			break;
+				CabBusReplyBuffer.count = 0;
+				CabBusReplyBuffer.Receive_Reply = true;
+				break;
+			}
 			}
 		}
-	}
 
 		if (CabBusReplyBuffer.Receive_Reply == true) //Store the Reply
 		{
 			CabBusReplyBuffer.data[CabBusReplyBuffer.count] = inByte;
-			
-		if (pLogger)
-		{
-			pLogger->print("\nReply Buffer Size: ");
-			pLogger->println(CabBusReplyBuffer.ReplySize);
-			pLogger->print("Active State: ");
-			pLogger->println(CabBusReplyBuffer.Receive_Reply);
-			pLogger->print("Byte Count: ");
-			pLogger->println(CabBusReplyBuffer.count);
-			pLogger->print("T:");
-			pLogger->println();
-			pLogger->println();
+
+			CabBusReplyBuffer.count++;
 		}
-		
-		CabBusReplyBuffer.count++;
-		}
-	
 
-	if (CabBusReplyBuffer.ReplySize > 0)
-	{
-		if (CabBusReplyBuffer.count == CabBusReplyBuffer.ReplySize)
+
+		if (CabBusReplyBuffer.ReplySize > 0)
 		{
-
-			CabBusReplyBuffer.count = 0;
-			CabBusReplyBuffer.ReplySize = 0;
-			CabBusReplyBuffer.Receive_Reply = false;
-			if (pLogger)
+			if (CabBusReplyBuffer.count == CabBusReplyBuffer.ReplySize)
 			{
-				pLogger->print("Active State: ");
-				pLogger->println(CabBusReplyBuffer.Receive_Reply);
-			}
 
+				CabBusReplyBuffer.count = 0;
+				CabBusReplyBuffer.ReplySize = 0;
+				CabBusReplyBuffer.Receive_Reply = false;
 
-			switch (CabBusReplyBuffer.data[0])
-			{
-			case 0xD8:
-			{
-				USBResponseBuffer.data[0] = ((CabBusReplyBuffer.data[1] & 0x03) << 6) + (CabBusReplyBuffer.data[2] & 0x3F);
-
-				switch ((CabBusReplyBuffer.data[1] & 0x30))
+				switch (CabBusReplyBuffer.data[0])
 				{
-				case 0x00:
+				case 0xD8:
+				{
+					USBResponseBuffer.data[0] = ((CabBusReplyBuffer.data[1] & 0x03) << 6) + (CabBusReplyBuffer.data[2] & 0x3F);
+
+					switch ((CabBusReplyBuffer.data[1] & 0x30))
+					{
+					case 0x00:
 					{
 						USBResponseBuffer.data[1] = (USB_COMMAND_COMPLETED_SUCCESSFULLY);
 						break;
@@ -1062,20 +1070,20 @@ void NceCabBus::processResponseByte(uint8_t inByte)
 						break;
 					}
 
+					}
+					if (USBCommandBuffer.data[0] == 0xB5) // This function has no status reply
+						USBResponseBuffer.count = 1;
+					else
+						USBResponseBuffer.count = 2;
+					break;
 				}
-				if (USBCommandBuffer.data[0] == 0xB5)
-				USBResponseBuffer.count = 1;
-				else
-				USBResponseBuffer.count = 2;
-				break;
-			}
-			case 0xD9:
-			{
-				USBResponseBuffer.data[0] = ((CabBusReplyBuffer.data[1] & 0x0F) << 4) + (CabBusReplyBuffer.data[2] & 0x0F);
-				USBResponseBuffer.data[1] = ((CabBusReplyBuffer.data[2] & 0x30) << 2) + (CabBusReplyBuffer.data[3] & 0x3F);
-
-				switch ((CabBusReplyBuffer.data[1] & 0x30))
+				case 0xD9:
 				{
+					USBResponseBuffer.data[0] = ((CabBusReplyBuffer.data[1] & 0x0F) << 4) + (CabBusReplyBuffer.data[2] & 0x0F);
+					USBResponseBuffer.data[1] = ((CabBusReplyBuffer.data[2] & 0x30) << 2) + (CabBusReplyBuffer.data[3] & 0x3F);
+
+					switch ((CabBusReplyBuffer.data[1] & 0x30))
+					{
 					case 0x00:
 					{
 						USBResponseBuffer.data[2] = (USB_COMMAND_COMPLETED_SUCCESSFULLY);
@@ -1102,23 +1110,23 @@ void NceCabBus::processResponseByte(uint8_t inByte)
 						break;
 					}
 
+					}
+					if ((USBCommandBuffer.data[0] == 0xB5) || (USBCommandBuffer.data[0] == 0x9B)) // This function has no status reply
+						USBResponseBuffer.count = 2;
+					else
+						USBResponseBuffer.count = 3;
+					break;
 				}
-				if ((USBCommandBuffer.data[0] == 0xB5) || (USBCommandBuffer.data[0] == 0x9B))
-					USBResponseBuffer.count = 2;
-				else
-					USBResponseBuffer.count = 3;
-				break;
-			}
-			case 0xDA:
-			{
-				USBResponseBuffer.data[0] = ((CabBusReplyBuffer.data[1] & 0x0F) << 4) + (CabBusReplyBuffer.data[2] & 0x0F);
-				USBResponseBuffer.data[1] = ((CabBusReplyBuffer.data[2] & 0x30) << 2) + (CabBusReplyBuffer.data[3] & 0x3F);
-				USBResponseBuffer.data[2] = ((CabBusReplyBuffer.data[4] & 0x0F) << 4) + (CabBusReplyBuffer.data[5] & 0x0F);
-				USBResponseBuffer.data[3] = ((CabBusReplyBuffer.data[5] & 0x30) << 2) + (CabBusReplyBuffer.data[6] & 0x3F);
-				
-
-				switch ((CabBusReplyBuffer.data[1] & 0x30))
+				case 0xDA:
 				{
+					USBResponseBuffer.data[0] = ((CabBusReplyBuffer.data[1] & 0x0F) << 4) + (CabBusReplyBuffer.data[2] & 0x0F);
+					USBResponseBuffer.data[1] = ((CabBusReplyBuffer.data[2] & 0x30) << 2) + (CabBusReplyBuffer.data[3] & 0x3F);
+					USBResponseBuffer.data[2] = ((CabBusReplyBuffer.data[4] & 0x0F) << 4) + (CabBusReplyBuffer.data[5] & 0x0F);
+					USBResponseBuffer.data[3] = ((CabBusReplyBuffer.data[5] & 0x30) << 2) + (CabBusReplyBuffer.data[6] & 0x3F);
+
+
+					switch ((CabBusReplyBuffer.data[1] & 0x30))
+					{
 					case 0x00:
 					{
 						USBResponseBuffer.data[4] = (USB_COMMAND_COMPLETED_SUCCESSFULLY);
@@ -1145,28 +1153,49 @@ void NceCabBus::processResponseByte(uint8_t inByte)
 						break;
 					}
 
+					}
+					if (USBCommandBuffer.data[0] == 0xB5) // This function has no status reply
+						USBResponseBuffer.count = 4;
+					else
+						USBResponseBuffer.count = 5;
+					break;
 				}
-				if (USBCommandBuffer.data[0] == 0xB5) // This function has no status reply
-					USBResponseBuffer.count = 4;
-				else
-				USBResponseBuffer.count = 5;
-				break;
-			}
+				}
+
+				if (func_USBSendBytes)
+				{
+
+
+					if (pLogger)
+					{
+						pLogger->print("\nUSB Command : ");
+						pLogger->println(USBCommandBuffer.data[0], HEX);
+						pLogger->print("\nUSB Command Length : ");
+						pLogger->println(USBCommandBuffer.data[1], HEX);
+						pLogger->print("\nSend USB: ");
+						for (uint8_t i = 0; i < USBResponseBuffer.count; i++)
+						{
+							if (USBResponseBuffer.data[i] < 16)
+								pLogger->print('0');
+							pLogger->print(USBResponseBuffer.data[i], HEX);
+							pLogger->print(' ');
+						}
+						pLogger->println();
+					}
+
+
+					func_USBSendBytes(USBResponseBuffer.data, USBResponseBuffer.count);
+					USBResponseBuffer.count = 0;
+					cabState = CAB_STATE_PING_OTHER;
+
+				}
+
+
 			}
 
-			if (func_USBSendBytes)
-			{
-				func_USBSendBytes(USBResponseBuffer.data, USBResponseBuffer.count);
-				USBResponseBuffer.count = 0;
-			}
-
-			
 		}
-
 	}
 
-
-	
 }
 
 
